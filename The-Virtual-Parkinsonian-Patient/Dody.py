@@ -196,7 +196,7 @@ n_nodes=conn_dopamine.shape[0]
 # Dp0 = np.full(n_nodes, 0.05)
 # y0 = np.concatenate((r0, V0, u0, Sa0, Sg0, Dp0))
 # t0 = 0.0
-t_max = 3000.0   # ms
+t_max = 500.0   # ms
 # dt = 0.1
 # sigma =  0.0
 # Use whatever initial conditions your notebook defines (y0, params, n_nodes, regions_labels)
@@ -226,12 +226,12 @@ df_T.to_csv("dody.csv", index=False)
 print("Saved transposed results to dody.csv")
 for col in df_T.columns[1:]:
     print(col,": ",df_T[col].max() - df_T[col].min())
-# for col in df_T.columns[1:]:  # skip wdopa column
-#     plt.plot(df_T["wdopa"], df_T[col], label=col, alpha=0.6)
-#
-# plt.xlabel("wdopa")
-# plt.ylabel("Firing rate r")
-# plt.title("Regional activation vs. dopamine level")
-# plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
-# plt.tight_layout()
-# plt.show()
+for col in df_T.columns[1:]:  # skip wdopa column
+    plt.plot(df_T["wdopa"], df_T[col], label=col, alpha=0.6)
+
+plt.xlabel("wdopa")
+plt.ylabel("Firing rate r")
+plt.title("Regional activation vs. dopamine level")
+plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+plt.tight_layout()
+plt.show()
