@@ -178,60 +178,122 @@ y0 = np.concatenate((r0, V0, u0, Sa0, Sg0, Dp0))
 #     MM[i, :, :] = np.array(y_all).T
 #
 
+def plot_regions_parameters(iterations, parameter, parameter_label, max_time):
+    t_max = max_time   # ms
+    wdopa_values = np.linspace(0.05, 5.0, iterations )
+    n_nodes=conn_dopamine.shape[0]
+    coupling_inhibitor, coupling_excitator = 0.07, 0.07
+    results = {}
+    offset=parameter
+    for w in wdopa_values:
+        coupling_weights = np.array([coupling_inhibitor, coupling_excitator, w])
+        y_all, t_all = DodyModel(network, y0.copy(), t0, t_max, dt, params, coupling_weights, sigma)
+        final = y_all[-1]  # last state vector
+        r = final[offset*n_nodes:(offset+1)*n_nodes]  # firing rates
+        results[w] = r
+        print(f"Finished simulation for {parameter_label} wdopa={w}, mean r={r.mean():.3f}, std = {r.std()}")
+    # Put results in a DataFrame
+    df = pd.DataFrame({f"{w}": results[w] for w in wdopa_values})
+    df.insert(0, "region", regions_labels)
 
-wdopa_values = np.linspace(0.05, 5.0, 21)
-n_nodes=conn_dopamine.shape[0]
-# dt = 0.001
-# t0 = 0.0
-# tf = 1000.0
-# c_inh=7e-2
-# c_exc=7e-2
-# c_dopa=7e-1
-# sigma=1e-5
-# r0 = np.full(n_nodes, 0.1)
-# V0 = np.full(n_nodes, -70.0)
-# u0 = np.full(n_nodes, 0.0)
-# Sa0 = np.full(n_nodes, 0.0)
-# Sg0 = np.full(n_nodes, 0.0)
-# Dp0 = np.full(n_nodes, 0.05)
-# y0 = np.concatenate((r0, V0, u0, Sa0, Sg0, Dp0))
-# t0 = 0.0
-t_max = 500.0   # ms
-# dt = 0.1
-# sigma =  0.0
-# Use whatever initial conditions your notebook defines (y0, params, n_nodes, regions_labels)
-coupling_inhibitor, coupling_excitator = 0.07, 0.07
-results = {}
-for w in wdopa_values:
-    coupling_weights = np.array([coupling_inhibitor, coupling_excitator, w])
-    y_all, t_all = DodyModel(network, y0.copy(), t0, t_max, dt, params, coupling_weights, sigma)
-    final = y_all[-1]  # last state vector
-    r = final[:n_nodes]  # firing rates
-    results[w] = r
-    print(f"Finished simulation for wdopa={w}, mean r={r.mean():.3f}, std = {r.std()}")
-# Put results in a DataFrame
-df = pd.DataFrame({f"{w}": results[w] for w in wdopa_values})
-df.insert(0, "region", regions_labels)
+    # Save to CSV
+    # df.to_csv("dody_activation_results.csv", index=False)
+    df_T = df.set_index("region").T
 
-# Save to CSV
-df.to_csv("dody_activation_results.csv", index=False)
-df_T = df.set_index("region").T
+    # Clean up the index so wdopa values are clear
+    df_T.index.name = "wdopa"
+    df_T.reset_index(inplace=True)
 
-# Clean up the index so wdopa values are clear
-df_T.index.name = "wdopa"
-df_T.reset_index(inplace=True)
+    # Save to CSV
+    # df_T.to_csv("dody.csv", index=False)
+    # print("Saved transposed results to dody.csv")
+    for col in df_T.columns[1:]:
+        print(col,": ",df_T[col].max() - df_T[col].min())
+    for col in df_T.columns[1:]:  # skip wdopa column
+        plt.plot(df_T["wdopa"], df_T[col], label=col, alpha=0.6)
 
-# Save to CSV
-df_T.to_csv("dody.csv", index=False)
-print("Saved transposed results to dody.csv")
-for col in df_T.columns[1:]:
-    print(col,": ",df_T[col].max() - df_T[col].min())
-for col in df_T.columns[1:]:  # skip wdopa column
-    plt.plot(df_T["wdopa"], df_T[col], label=col, alpha=0.6)
+    plt.xlabel("wdopa")
+    plt.ylabel(parameter_label)
+    plt.title(f"{parameter_label} vs. dopamine level")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig("plots/"+parameter_label + ".png")
+    plt.show()
 
-plt.xlabel("wdopa")
-plt.ylabel("Firing rate r")
-plt.title("Regional activation vs. dopamine level")
-plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
-plt.tight_layout()
-plt.show()
+def plot_times_firing_rate_single_region(region, iterations):
+    import numpy as np
+    import pandas as pd
+    wdopa_values = np.linspace(0.05, 5.0, iterations)
+    t0 = 0.0
+    t_max = 500.0  # ms
+    dt = 0.1
+    # sigma = sigma if 'sigma' in globals() else 0.0
+    # Use whatever initial conditions your notebook defines (y0, params, n_nodes, regions_labels)
+    coupling_inhibitor, coupling_excitator = 0.07, 0.07
+    results = {}
+    times = []
+    region_index = regions_labels.index(region)
+    for w in wdopa_values:
+        coupling_weights = np.array([coupling_inhibitor, coupling_excitator, w])
+        y_all, t_all = DodyModel(network, y0.copy(), t0, t_max, dt, params, coupling_weights, sigma)
+        r_timecourse = y_all[:, region_index]
+
+        plt.plot(t_all, r_timecourse, label=f"wdopa={w:.2f}", alpha=0.7)
+        print(f"Finished simulation for wdopa={w}")
+    plt.xlabel("Time (ms)")
+    plt.ylabel(f"Firing rate r ({region})")
+    plt.title(f"Time evolution of firing rate for region {region}")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+    plt.tight_layout()
+    plt.show()
+
+def original_simulation():
+    dt = 0.001
+    t0 = 0.0
+    tf = 500.0
+    sigma = 1e-5
+    r0 = np.full(n_nodes, 0.1)
+    V0 = np.full(n_nodes, -70.0)
+    u0 = np.full(n_nodes, 0.0)
+    Sa0 = np.full(n_nodes, 0.0)
+    Sg0 = np.full(n_nodes, 0.0)
+    Dp0 = np.full(n_nodes, 0.05)
+    y0 = np.concatenate((r0, V0, u0, Sa0, Sg0, Dp0))
+    npoint = tf / dt / 100
+    number_of_variables = 6
+
+    prior_min = [7e-1]  # min value used for simulations
+    prior_max = [7e-0]  # max value used for simulations
+    prior = utils.torchutils.BoxUniform(low=torch.as_tensor(prior_min), high=torch.as_tensor(prior_max))
+
+    num_simulations = 10
+    ckk_inh = 7e-2
+    ckk_exc = 7e-2
+    matrix_C_XXX = np.zeros((num_simulations, 3))
+    matrix_C_XXX[:, 0] = c_inh
+    matrix_C_XXX[:, 1] = c_exc
+
+    MM = np.zeros((matrix_C_XXX.shape[0], number_of_variables * n_nodes, int(npoint)))
+
+    for i in range(num_simulations):
+        c_dopa = prior.sample().numpy()
+        matrix_C_XXX[i, 2] = c_dopa.item()
+        coupling_weights = np.array([c_inh, c_exc, c_dopa.item()])
+        print(coupling_weights)
+        # Run simulation here with the current combination of parameters
+        (y_all, t_all) = DodyModel(network, y0, t0, tf, dt, params, coupling_weights, sigma)
+        MM[i, :, :] = np.array(y_all).T
+        continue
+
+def plot_all_parameters(max_time):
+    plot_regions_parameters(10, 0, "firing rate r",max_time)
+    plot_regions_parameters(10, 1, "membrane potential v",max_time)
+    plot_regions_parameters(10, 2, "adaptation current u",max_time)
+    plot_regions_parameters(10, 3, "synaptic activity (excitatory) Sa",max_time)
+    plot_regions_parameters(10, 4, "synaptic activity (inhibitory) Sg",max_time)
+    plot_regions_parameters(10, 5, "dopamine concentration Dp",max_time)
+# plot_times_firing_rate_single_region("L.BSTS",10)
+# plot_times_firing_rate_single_region("SubstantiaNigraLH",10)
+# original_simulation()
+plot_all_parameters(max_time=500)
